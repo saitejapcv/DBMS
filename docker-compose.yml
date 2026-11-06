@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./student-result-system/database/migrations/001_member1_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./student-result-system/database/docker-init/10_create_app_user.sh:/docker-entrypoint-initdb.d/10_create_app_user.sh:ro
+      - ./student-result-system/database/migrations/member1_security.sql:/docker-entrypoint-initdb.d/20_security.sql:ro
+      - ./student-result-system/database/migrations/002_member1_authorization.sql:/docker-entrypoint-initdb.d/30_authorization.sql:ro
+      - ./student-result-system/database/migrations/add_subject_department_index.sql:/docker-entrypoint-initdb.d/40_indexes.sql:ro
+      - ./student-result-system/database/migrations/member1_sample_data.sql:/docker-entrypoint-initdb.d/45_sample_data.sql:ro
+      - ./student-result-system/database/docker-init/50_development_seed.sql:/docker-entrypoint-initdb.d/50_development_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./student-result-system/backend
+    environment:
+      DATABASE_URL: postgresql://app_user:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      ADMIN_USER_ID: "5"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

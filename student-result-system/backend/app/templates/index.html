@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Student Result and Transcript System">
+  <title>Academic Records Portal</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <main id="login-view" class="login-layout">
+    <section class="login-card" aria-labelledby="login-title">
+      <p class="eyebrow">Student Result and Transcript System</p>
+      <h1 id="login-title">Academic Records Portal</h1>
+      <p class="muted">Sign in with the account issued by your institution.</p>
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="50">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <p id="login-message" class="form-message" role="alert" aria-live="polite"></p>
+        <button class="button button-primary" type="submit">Sign in</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="app-shell" class="app-shell" hidden>
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">AR</span><div><strong>Academic Records</strong><small>Member 1 portal</small></div></div>
+      <nav id="navigation" class="navigation"></nav>
+      <button id="logout-button" class="button button-quiet" type="button">Sign out</button>
+    </aside>
+    <main class="content">
+      <header class="topbar">
+        <button id="menu-button" class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false">☰</button>
+        <div><p class="eyebrow">Academic dashboard</p><h1 id="page-title">Dashboard</h1></div>
+        <div id="user-summary" class="user-summary"></div>
+      </header>
+      <p id="global-message" class="global-message" role="status" aria-live="polite"></p>
+      <section id="page-content" class="page-content" aria-live="polite"></section>
+    </main>
+  </div>
+  <script src="/static/js/app.js" defer></script>
+</body>
+</html>
