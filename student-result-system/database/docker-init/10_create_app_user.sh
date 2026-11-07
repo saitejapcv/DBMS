@@ -13,5 +13,4 @@ GRANT SELECT ON users, departments, students, professors, subjects TO app_user;
 GRANT INSERT, UPDATE, DELETE ON departments, students, professors, subjects TO app_user;
 GRANT INSERT (username, email, password_hash, name) ON users TO app_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
-GRANT SELECT ON v_user_role TO app_user;
 SQL

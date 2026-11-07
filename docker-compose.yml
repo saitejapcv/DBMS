@@ -17,6 +17,7 @@ services:
       - ./student-result-system/database/migrations/add_subject_department_index.sql:/docker-entrypoint-initdb.d/40_indexes.sql:ro
       - ./student-result-system/database/migrations/member1_sample_data.sql:/docker-entrypoint-initdb.d/45_sample_data.sql:ro
       - ./student-result-system/database/docker-init/50_development_seed.sql:/docker-entrypoint-initdb.d/50_development_seed.sql:ro
+      - ./student-result-system/database/docker-init/60_view_grants.sql:/docker-entrypoint-initdb.d/60_view_grants.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
