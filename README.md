@@ -9,6 +9,7 @@ Member 1 delivers:
 - JWT login and role-aware access for administrators, professors, and students
 - CRUD APIs for departments, professors, students, subjects, and user accounts
 - A browser UI at `/` and interactive API documentation at `/docs`
+- Admin forms for registering student and professor accounts from the Users page
 - PostgreSQL schema, access controls, row-level-security policies, indexes, and development sample data
 
 Result entry, transcript generation, and other Member 2/3 modules remain future work.
