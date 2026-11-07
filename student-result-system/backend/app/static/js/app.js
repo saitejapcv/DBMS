@@ -231,15 +231,17 @@ async function renderUsers() {
   document.querySelector("#user-cancel").addEventListener("click", renderUsers);
   document.querySelector("#student-registration-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
     data.admission_year = Number(data.admission_year);
     data.current_semester = Number(data.current_semester);
-    try { await api("/students/", { method: "POST", body: JSON.stringify(data) }); notice("Student created successfully."); event.currentTarget.reset(); renderUsers(); } catch (error) { notice(error.message, true); }
+    try { await api("/students/", { method: "POST", body: JSON.stringify(data) }); notice("Student created successfully."); form.reset(); renderUsers(); } catch (error) { notice(error.message, true); }
   });
   document.querySelector("#professor-registration-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    try { await api("/professors/", { method: "POST", body: JSON.stringify(data) }); notice("Professor created successfully."); event.currentTarget.reset(); renderUsers(); } catch (error) { notice(error.message, true); }
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+    try { await api("/professors/", { method: "POST", body: JSON.stringify(data) }); notice("Professor created successfully."); form.reset(); renderUsers(); } catch (error) { notice(error.message, true); }
   });
   document.querySelectorAll("[data-delete-user]").forEach((button) => button.addEventListener("click", async () => {
     if (!window.confirm("Delete this user and linked profile? This cannot be undone.")) return;
