@@ -8,6 +8,7 @@ from app.schemas.result_schema import (
     AcademicSummaryResponse,
     BacklogResponse,
     GradeScaleResponse,
+    StudentMarkResponse,
     RevaluationCreate,
     RevaluationDecision,
     RevaluationResponse,
@@ -51,6 +52,14 @@ def get_my_cgpa(
     current_user: dict = Depends(require_student()),
 ):
     return {"cgpa": service.cgpa(conn, current_user["user_id"])}
+
+
+@router.get("/me/marks", response_model=list[StudentMarkResponse])
+def get_my_marks(
+    conn: Connection = Depends(get_user_db_connection),
+    current_user: dict = Depends(require_student()),
+):
+    return service.student_marks(conn, current_user["user_id"])
 
 
 @router.get("/me/sgpa/{semester_no}")

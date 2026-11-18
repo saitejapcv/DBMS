@@ -20,6 +20,10 @@ def grade_scale(conn: Connection):
     return repo.get_grade_scale(conn)
 
 
+def student_marks(conn: Connection, student_id: int):
+    return repo.get_student_marks(conn, student_id)
+
+
 def cgpa(conn: Connection, student_id: int):
     return repo.get_cgpa(conn, student_id)
 

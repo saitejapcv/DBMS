@@ -47,6 +47,26 @@ def get_grade_scale(conn: Connection):
     ).fetchall()
 
 
+def get_student_marks(conn: Connection, student_id: int):
+    return conn.execute(
+        """
+        SELECT e.enrollment_id, ta.subject_code, s.subject_name,
+               ta.academic_year, ta.term, ec.component_id,
+               ec.name AS component_name, ec.max_marks, ec.weightage,
+               m.marks_obtained
+        FROM marks m
+        JOIN enrollments e ON e.enrollment_id = m.enrollment_id
+        JOIN teaching_assignments ta ON ta.assignment_id = e.assignment_id
+        JOIN subjects s ON s.subject_code = ta.subject_code
+        JOIN evaluation_components ec ON ec.component_id = m.component_id
+        WHERE e.student_id = %s
+          AND ta.published_at IS NOT NULL
+        ORDER BY ta.academic_year, ta.term, ta.subject_code, ec.component_id
+        """,
+        (student_id,),
+    ).fetchall()
+
+
 def get_cgpa(conn: Connection, student_id: int):
     return conn.execute("SELECT fn_cgpa(%s) AS value", (student_id,)).fetchone()["value"]
 

@@ -23,7 +23,7 @@ const menuItems = [
   ["users", "Admin users", ["admin"]],
   ["course-offerings", "Teaching Assignments", ["student", "professor", "admin"]],
   ["enrollments", "Enrollments", ["professor", "admin"]],
-  ["marks", "Marks", ["professor", "admin"]],
+  ["marks", "Marks", ["student", "professor", "admin"]],
   ["grade-scale", "Grade Scale", ["student", "professor", "admin"]],
   ["revaluation", "Revaluation Requests", ["student", "professor", "admin"]],
   ["transcript", "Transcript", ["student"]],
@@ -99,7 +99,7 @@ async function go(view) {
     if (view === "users") await renderUsers();
     if (view === "course-offerings") await renderAssignments();
     if (view === "enrollments") await renderEnrollments();
-    if (view === "marks") await renderMarks();
+    if (view === "marks") await (state.user.role === "student" ? renderStudentMarks() : renderMarks());
     if (view === "grade-scale") await renderGradeScale();
     if (view === "revaluation") await renderRevaluation();
     if (view === "transcript") await renderTranscript();
@@ -170,6 +170,11 @@ async function renderMarks() {
     if (components.length) { const marks = await api(`/assignments/components/${components[0].component_id}/marks`); document.querySelector("#component-marks").innerHTML = `<section class="panel"><h3>Saved marks</h3><div class="table-wrap"><table><thead><tr><th>Enrollment</th><th>Student</th><th>Marks</th><th>Entered</th></tr></thead><tbody>${marks.map((row) => `<tr><td>${row.enrollment_id}</td><td>${row.student_id}</td><td>${row.marks_obtained}</td><td>${esc(row.entered_at)}</td></tr>`).join("") || "<tr><td colspan=4>No marks found.</td></tr>"}</tbody></table></div></section>`; }
   };
   if (assignments.length) { select.addEventListener("change", load); await load(); } else document.querySelector("#marks-content").innerHTML = unavailable("No assignments", "Create a teaching assignment first.");
+}
+
+async function renderStudentMarks() {
+  const rows = await api("/results/me/marks");
+  ui.content.innerHTML = `<section class="panel"><p class="eyebrow">Published results</p><h2>My marks</h2><p class="subtle">Component marks become visible after the administrator publishes the assignment results.</p><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Term</th><th>Component</th><th>Max marks</th><th>Weightage</th><th>Marks obtained</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.subject_code)} — ${esc(row.subject_name)}</td><td>${esc(row.academic_year)} / ${esc(row.term)}</td><td>${esc(row.component_name)}</td><td>${row.max_marks}</td><td>${row.weightage}%</td><td><strong>${row.marks_obtained}</strong></td></tr>`).join("") || "<tr><td colspan=6>No published marks found.</td></tr>"}</tbody></table></div></section>`;
 }
 
 async function renderGradeScale() {

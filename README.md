@@ -112,7 +112,7 @@ Neither `.env` file is committed. Use the matching `.env.example` as a template.
 
 Send the token returned by login as `Authorization: Bearer <token>` for protected endpoints. Use `/docs` for the full request and response schemas.
 
-The browser portal includes Teaching Assignments, Enrollments, Marks, Grade Scale, Transcript, and Revaluation pages for the roles allowed to use each endpoint.
+The browser portal includes Teaching Assignments, Enrollments, Marks, Grade Scale, Transcript, and Revaluation pages for the roles allowed to use each endpoint. Students can view component-level marks after results are published.
 
 ## Security note
 

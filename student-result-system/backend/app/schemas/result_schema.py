@@ -44,6 +44,19 @@ class GradeScaleResponse(BaseModel):
     grade_points: Decimal
 
 
+class StudentMarkResponse(BaseModel):
+    enrollment_id: int
+    subject_code: str
+    subject_name: str
+    academic_year: str
+    term: str
+    component_id: int
+    component_name: str
+    max_marks: Decimal
+    weightage: Decimal
+    marks_obtained: Decimal
+
+
 class RevaluationCreate(BaseModel):
     enrollment_id: int
     component_id: int
