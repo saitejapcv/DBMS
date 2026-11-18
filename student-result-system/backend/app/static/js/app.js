@@ -185,9 +185,35 @@ async function renderTranscript() {
 
 async function renderRevaluation() {
   const rows = await api("/results/revaluation");
-  const create = state.user.role === "student" ? `<aside class="panel"><h3>Request revaluation</h3><form id="revaluation-form"><label>Enrollment ID<input id="reval-enrollment" type="number" min="1" required></label><label>Component ID<input id="reval-component" type="number" min="1" required></label><label>Reason<textarea id="reval-reason" rows="4" required></textarea></label><label>Window (days)<input id="reval-window" type="number" min="1" max="90" value="15" required></label><div class="form-actions"><button class="button button-primary">Submit request</button></div></form></aside>` : state.user.role === "admin" ? `<aside class="panel"><h3>Administrator view</h3><p class="subtle">Administrators can review request status. Decisions remain restricted to the assigned professor.</p></aside>` : "";
+  let studentEnrollments = [];
+  if (state.user.role === "student") {
+    const assignments = await api("/assignments/");
+    const grouped = await Promise.all(assignments.map(async (assignment) => {
+      const enrollments = await api(`/assignments/${assignment.assignment_id}/enrollments`);
+      const mine = enrollments.filter((row) => row.student_id === state.user.user_id);
+      if (!mine.length) return [];
+      const components = await api(`/assignments/${assignment.assignment_id}/components`);
+      return mine.map((enrollment) => ({ assignment, enrollment, components }));
+    }));
+    studentEnrollments = grouped.flat();
+  }
+  const assignmentOptions = studentEnrollments.map(({ assignment }) => `<option value="${assignment.assignment_id}">${esc(assignment.subject_code)} — ${esc(assignment.academic_year)} ${esc(assignment.term)}</option>`).filter((option, index, options) => options.indexOf(option) === index).join("");
+  const create = state.user.role === "student" && studentEnrollments.length ? `<aside class="panel"><h3>Request revaluation</h3><form id="revaluation-form"><label>Teaching assignment<select id="reval-assignment" required>${assignmentOptions}</select></label><label>Enrollment<select id="reval-enrollment" required></select></label><label>Component<select id="reval-component" required></select></label><label>Reason<textarea id="reval-reason" rows="4" required></textarea></label><label>Window (days)<input id="reval-window" type="number" min="1" max="90" value="15" required></label><div class="form-actions"><button class="button button-primary">Submit request</button></div></form></aside>` : state.user.role === "student" ? `<aside class="panel"><h3>No eligible enrollments</h3><p class="subtle">Revaluation can be requested after you have published results with marks.</p></aside>` : state.user.role === "admin" ? `<aside class="panel"><h3>Administrator view</h3><p class="subtle">Administrators can review request status. Decisions remain restricted to the assigned professor.</p></aside>` : "";
   ui.content.innerHTML = `<div class="split-layout"><section class="panel"><p class="eyebrow">Academic review</p><h2>Revaluation requests</h2><div class="table-wrap"><table><thead><tr><th>Request</th><th>Enrollment</th><th>Component</th><th>Reason</th><th>Status</th><th>Decision</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${row.request_id}</td><td>${row.enrollment_id}</td><td>${row.component_id}</td><td>${esc(row.reason)}</td><td>${esc(row.revaluation_status)}</td><td>${state.user.role === "professor" && !row.decision ? `<button class="button button-secondary button-small" data-reval-decision="${row.request_id}" data-decision="Approved">Approve</button> <button class="button button-danger button-small" data-reval-decision="${row.request_id}" data-decision="Rejected">Reject</button>` : esc(row.decision || "Pending")}</td></tr>`).join("") || "<tr><td colspan=6>No requests found.</td></tr>"}</tbody></table></div></section>${create}</div>`;
-  if (state.user.role === "student") document.querySelector("#revaluation-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = { enrollment_id: Number(document.querySelector("#reval-enrollment").value), component_id: Number(document.querySelector("#reval-component").value), reason: document.querySelector("#reval-reason").value.trim(), window_days: Number(document.querySelector("#reval-window").value) }; try { await api("/results/revaluation", { method: "POST", body: JSON.stringify(data) }); notice("Revaluation request submitted."); renderRevaluation(); } catch (error) { notice(error.message, true); } });
+  if (state.user.role === "student") {
+    const assignmentSelect = document.querySelector("#reval-assignment");
+    const enrollmentSelect = document.querySelector("#reval-enrollment");
+    const componentSelect = document.querySelector("#reval-component");
+    const updateRevaluationOptions = () => {
+      const selected = studentEnrollments.filter(({ assignment }) => String(assignment.assignment_id) === assignmentSelect.value);
+      enrollmentSelect.innerHTML = selected.map(({ enrollment }) => `<option value="${enrollment.enrollment_id}">Enrollment ${enrollment.enrollment_id} — Student ${enrollment.student_id}</option>`).join("");
+      const components = selected[0]?.components || [];
+      componentSelect.innerHTML = components.map((component) => `<option value="${component.component_id}">${esc(component.name)} — ${component.weightage}% of total</option>`).join("");
+    };
+    assignmentSelect.addEventListener("change", updateRevaluationOptions);
+    updateRevaluationOptions();
+    document.querySelector("#revaluation-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = { enrollment_id: Number(enrollmentSelect.value), component_id: Number(componentSelect.value), reason: document.querySelector("#reval-reason").value.trim(), window_days: Number(document.querySelector("#reval-window").value) }; try { await api("/results/revaluation", { method: "POST", body: JSON.stringify(data) }); notice("Revaluation request submitted."); renderRevaluation(); } catch (error) { notice(error.message, true); } });
+  }
   document.querySelectorAll("[data-reval-decision]").forEach((button) => button.addEventListener("click", async () => { const decision = button.dataset.decision; let newMarks = null; if (decision === "Approved") { const value = window.prompt("Enter the new marks:"); if (value === null) return; newMarks = Number(value); } try { await api(`/results/revaluation/${button.dataset.revalDecision}`, { method: "PATCH", body: JSON.stringify({ decision, new_marks: newMarks }) }); notice("Revaluation decision saved."); renderRevaluation(); } catch (error) { notice(error.message, true); } }));
 }
 
