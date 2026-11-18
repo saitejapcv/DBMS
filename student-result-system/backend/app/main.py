@@ -11,6 +11,7 @@ from app.routes import (
     auth_routes,
     user_routes,
     academic_routes,
+    result_routes,
 )
 from app.exceptions import register_exception_handlers
 
@@ -32,6 +33,7 @@ app.include_router(department_routes.router)
 app.include_router(professor_routes.router)
 app.include_router(subject_routes.router)
 app.include_router(academic_routes.router)
+app.include_router(result_routes.router)
 
 
 @app.get("/")

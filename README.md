@@ -1,6 +1,6 @@
 # Student Result and Transcript System
 
-A FastAPI and PostgreSQL application for managing users, departments, professors, students, and subjects. It includes a plain HTML/CSS/JavaScript interface served by FastAPI, REST API documentation, role-based authentication, and PostgreSQL row-level security work from Member 1.
+A FastAPI and PostgreSQL application for managing users, departments, professors, students, subjects, teaching assignments, enrollments, evaluation components, and marks. It includes a plain HTML/CSS/JavaScript interface served by FastAPI, REST API documentation, role-based authentication, and PostgreSQL row-level security.
 
 ## Current scope
 
@@ -12,7 +12,7 @@ Member 1 delivers:
 - Admin forms for registering student and professor accounts from the Users page
 - PostgreSQL schema, access controls, row-level-security policies, indexes, and development sample data
 
-Result entry, transcript generation, and other Member 2/3 modules remain future work.
+Academic assignment and marks APIs are included under `/assignments`, with database triggers enforcing component weightage, marks consistency, professor authorization, and published-grade locking. Member 3 adds result calculation, transcripts, grade scales, CGPA/SGPA, publishing, backlogs, and revaluation under `/results`.
 
 ## Quick start with Docker
 
@@ -83,7 +83,7 @@ student-result-system/
 │   ├── app/repositories/    PostgreSQL queries
 │   └── app/static/          Plain HTML/CSS/JavaScript frontend assets
 └── database/
-    ├── migrations/          Schema, authorization, RLS, seed, and index SQL
+    ├── migrations/          Schema, authorization, RLS, academic, result, seed, and index SQL
     └── docker-init/         Docker-only app-user and development-admin initialization
 ```
 
@@ -106,9 +106,13 @@ Neither `.env` file is committed. Use the matching `.env.example` as a template.
 - `POST /auth/login` obtains a bearer token.
 - `GET /users/me` returns the signed-in user.
 - `/departments`, `/students`, `/professors`, `/subjects`, and `/users` provide the Member 1 management endpoints.
+- `/assignments` provides teaching assignment, enrollment, evaluation component, and bulk marks endpoints.
+- `/results` provides transcripts, CGPA/SGPA, grade scales, result publishing, backlogs, and revaluation endpoints.
 - `GET /health` returns a simple health response.
 
 Send the token returned by login as `Authorization: Bearer <token>` for protected endpoints. Use `/docs` for the full request and response schemas.
+
+The browser portal includes Teaching Assignments, Enrollments, Marks, Grade Scale, Transcript, and Revaluation pages for the roles allowed to use each endpoint.
 
 ## Security note
 

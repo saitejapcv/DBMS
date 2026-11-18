@@ -20,6 +20,7 @@ from app.services.professor_service import (
     edit_professor,
     remove_professor
 )
+from app.repositories.professor_repository import get_professor_by_user_id
 
 
 router = APIRouter(
@@ -45,6 +46,17 @@ def get_professors_route(
     current_user: dict = Depends(require_admin()),
 ):
     return list_professors(conn)
+
+
+@router.get("/me", response_model=ProfessorResponse)
+def get_my_professor_profile(
+    conn: Connection = Depends(get_user_db_connection),
+    current_user: dict = Depends(get_current_user),
+):
+    professor = get_professor_by_user_id(conn, current_user["user_id"])
+    if professor is None:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+    return professor
 
 
 # 3. GET PROFESSOR BY EMPLOYEE ID

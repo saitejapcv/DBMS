@@ -87,14 +87,17 @@ BEGIN
     JOIN teaching_assignments ta ON e.assignment_id = ta.assignment_id
     WHERE e.enrollment_id = NEW.enrollment_id;
 
-    IF v_published_at IS NOT NULL THEN
+    IF v_published_at IS NOT NULL
+       AND COALESCE(current_setting('app.allow_revaluation', TRUE), 'false') <> 'true' THEN
         RAISE EXCEPTION 'Action locked: Cannot insert or modify marks after grades are published.';
     END IF;
 
     v_current_user := current_setting('app.user_id', TRUE);
     v_is_admin := current_setting('app.is_admin', TRUE);
 
-    IF v_current_user IS NOT NULL AND v_current_user <> '' AND COALESCE(v_is_admin, 'false') <> 'true' THEN
+    IF v_current_user IS NOT NULL AND v_current_user <> ''
+       AND COALESCE(v_is_admin, 'false') <> 'true'
+       AND COALESCE(current_setting('app.allow_revaluation', TRUE), 'false') <> 'true' THEN
         IF v_professor_id <> v_current_user::BIGINT THEN
             RAISE EXCEPTION 'Authorization error: Only the assigned professor can enter or modify marks.';
         END IF;

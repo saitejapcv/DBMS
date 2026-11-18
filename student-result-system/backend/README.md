@@ -35,6 +35,8 @@ The tests use Docker PostgreSQL. User update/delete tests run in transactions th
 - Role-aware dashboard navigation
 - Student profile, departments, and subjects
 - Admin department, subject, and user management
-- Clearly marked future placeholders for Member 2 and 3 modules
+- Browser pages for assignments, enrollments, marks, grade scales, transcripts, and revaluation
 
-The professor self-profile is intentionally unavailable until the backend provides a safe `GET /professors/me` endpoint.
+Academic assignment and marks endpoints are available under `/assignments`. Member 3 result, transcript, CGPA/SGPA, backlog, grade-scale, result-publishing, and revaluation endpoints are available under `/results`. The database migrations install the related views, functions, procedures, and triggers.
+
+The professor self-profile is available through the safe `GET /professors/me` endpoint.

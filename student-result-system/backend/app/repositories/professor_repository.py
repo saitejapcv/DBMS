@@ -125,6 +125,20 @@ def get_professor_by_employee_id(
     ).fetchone()
 
 
+def get_professor_by_user_id(conn: Connection, user_id: int):
+    return conn.execute(
+        """
+        SELECT p.employee_id, u.name, u.email, p.designation,
+               p.department_code, d.department_name
+        FROM professors p
+        JOIN users u ON p.user_id = u.user_id
+        JOIN departments d ON p.department_code = d.department_code
+        WHERE p.user_id = %s
+        """,
+        (user_id,),
+    ).fetchone()
+
+
 # 4. UPDATE PROFESSOR
 def update_professor(
     conn: Connection,

@@ -7,6 +7,9 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def connect():
     url = os.getenv("DATABASE_URL")

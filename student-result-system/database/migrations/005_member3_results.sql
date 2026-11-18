@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS grade_scale (
     letter_grade VARCHAR(5) PRIMARY KEY,
     min_marks NUMERIC(6,2) UNIQUE,
-    grade_points NUMERIC(4,2) NOT NULL UNIQUE,
+    grade_points NUMERIC(4,2) NOT NULL,
     CONSTRAINT grade_scale_points_nonnegative CHECK (grade_points >= 0),
     CONSTRAINT grade_scale_min_marks_range CHECK (
         min_marks IS NULL OR (min_marks >= 0 AND min_marks <= 100)
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS revaluation_request (
         FOREIGN KEY (enrollment_id, component_id)
         REFERENCES marks(enrollment_id, component_id),
     CONSTRAINT reval_reviewer_fk
-        FOREIGN KEY (reviewed_by) REFERENCES professor(user_id),
+        FOREIGN KEY (reviewed_by) REFERENCES professors(user_id),
     CONSTRAINT reval_decision_timestamp_pair CHECK (
         (decision IS NULL AND decided_at IS NULL)
         OR (decision IS NOT NULL AND decided_at IS NOT NULL)
@@ -49,7 +49,7 @@ AS $$
         2
     )
     FROM marks m
-    JOIN evaluation_component ec ON ec.component_id = m.component_id
+    JOIN evaluation_components ec ON ec.component_id = m.component_id
     WHERE m.enrollment_id = p_enrollment_id;
 $$;
 CREATE OR REPLACE FUNCTION fn_grade(p_total NUMERIC)
@@ -78,7 +78,7 @@ WITH result_rows AS (
         ta.academic_year,
         ta.term,
         st.admission_year,
-        (2 * (ta.academic_year - st.admission_year)
+        (2 * (split_part(ta.academic_year, '-', 1)::INTEGER - st.admission_year)
           + CASE ta.term WHEN 'ODD' THEN 1 WHEN 'EVEN' THEN 2 WHEN 'SUMMER' THEN 3 END
         )::INTEGER AS semester_no,
         fn_total(e.enrollment_id) AS total_marks,
@@ -94,10 +94,10 @@ WITH result_rows AS (
                      CASE ta.term WHEN 'ODD' THEN 1 WHEN 'EVEN' THEN 2 WHEN 'SUMMER' THEN 3 END,
                      e.enrollment_id
         ) AS attempt_no
-    FROM enrollment e
-    JOIN teaching_assignment ta ON ta.assignment_id = e.assignment_id
-    JOIN student st ON st.user_id = e.student_id
-    JOIN subject s ON s.subject_code = ta.subject_code
+    FROM enrollments e
+    JOIN teaching_assignments ta ON ta.assignment_id = e.assignment_id
+    JOIN students st ON st.user_id = e.student_id
+    JOIN subjects s ON s.subject_code = ta.subject_code
     LEFT JOIN grade_scale gs ON gs.letter_grade = e.grade
 )
 SELECT * FROM result_rows;
@@ -167,7 +167,7 @@ SELECT
         WHEN submitted_at IS NOT NULL THEN 'Submitted'
         ELSE 'Draft'
     END AS marks_status
-FROM teaching_assignment;
+FROM teaching_assignments;
 CREATE OR REPLACE VIEW v_reval_status AS
 SELECT
     request_id, enrollment_id, component_id, reason, old_marks,
@@ -208,7 +208,7 @@ DECLARE
 BEGIN
     SELECT submitted_at, published_at
       INTO v_submitted_at, v_published_at
-    FROM teaching_assignment
+    FROM teaching_assignments
     WHERE assignment_id = p_assignment_id
     FOR UPDATE;
     IF NOT FOUND THEN
@@ -222,20 +222,20 @@ BEGIN
     END IF;
     SELECT COALESCE(SUM(weightage), 0)
       INTO v_weight_total
-    FROM evaluation_component
+    FROM evaluation_components
     WHERE assignment_id = p_assignment_id;
     IF v_weight_total <> 100 THEN
         RAISE EXCEPTION 'Evaluation component weightages must total 100; got %', v_weight_total;
     END IF;
     FOR v_enrollment IN
         SELECT enrollment_id
-        FROM enrollment
+        FROM enrollments
         WHERE assignment_id = p_assignment_id
         FOR UPDATE
     LOOP
         IF EXISTS (
             SELECT 1
-            FROM evaluation_component ec
+            FROM evaluation_components ec
             WHERE ec.assignment_id = p_assignment_id
               AND NOT EXISTS (
                   SELECT 1 FROM marks m
@@ -252,11 +252,11 @@ BEGIN
             RAISE EXCEPTION 'Cannot calculate grade for enrollment %',
                 v_enrollment.enrollment_id;
         END IF;
-        UPDATE enrollment
+        UPDATE enrollments
         SET grade = v_grade
         WHERE enrollment_id = v_enrollment.enrollment_id;
     END LOOP;
-    UPDATE teaching_assignment
+    UPDATE teaching_assignments
     SET published_at = CURRENT_TIMESTAMP
     WHERE assignment_id = p_assignment_id;
 END;
@@ -279,8 +279,8 @@ BEGIN
     END IF;
     SELECT ta.published_at, e.assignment_id
       INTO v_published_at, v_assignment_id
-    FROM enrollment e
-    JOIN teaching_assignment ta ON ta.assignment_id = e.assignment_id
+    FROM enrollments e
+    JOIN teaching_assignments ta ON ta.assignment_id = e.assignment_id
     WHERE e.enrollment_id = p_enrollment_id;
     IF NOT FOUND OR v_published_at IS NULL THEN
         RAISE EXCEPTION 'Results must be published before revaluation';
@@ -289,7 +289,7 @@ BEGIN
         RAISE EXCEPTION 'Revaluation window has closed';
     END IF;
     IF NOT EXISTS (
-        SELECT 1 FROM evaluation_component
+        SELECT 1 FROM evaluation_components
         WHERE component_id = p_component_id
           AND assignment_id = v_assignment_id
     ) THEN
@@ -325,6 +325,7 @@ DECLARE
     v_max_marks NUMERIC;
     v_decision VARCHAR(10);
 BEGIN
+    PERFORM set_config('app.allow_revaluation', 'true', TRUE);
     IF p_decision NOT IN ('Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Decision must be Approved or Rejected';
     END IF;
@@ -339,9 +340,9 @@ BEGIN
       INTO v_enrollment_id, v_component_id, v_decision,
            v_assignment_professor, v_max_marks
     FROM revaluation_request rr
-    JOIN enrollment e ON e.enrollment_id = rr.enrollment_id
-    JOIN teaching_assignment ta ON ta.assignment_id = e.assignment_id
-    JOIN evaluation_component ec ON ec.component_id = rr.component_id
+    JOIN enrollments e ON e.enrollment_id = rr.enrollment_id
+    JOIN teaching_assignments ta ON ta.assignment_id = e.assignment_id
+    JOIN evaluation_components ec ON ec.component_id = rr.component_id
     WHERE rr.request_id = p_request_id
     FOR UPDATE OF rr;
     IF NOT FOUND THEN
@@ -367,7 +368,7 @@ BEGIN
             entered_at = CURRENT_TIMESTAMP
         WHERE enrollment_id = v_enrollment_id
           AND component_id = v_component_id;
-        UPDATE enrollment
+        UPDATE enrollments
         SET grade = fn_grade(fn_total(v_enrollment_id))
         WHERE enrollment_id = v_enrollment_id;
     END IF;
@@ -380,4 +381,15 @@ SELECT
     st.admission_year,
     fn_cgpa(st.user_id) AS cgpa,
     fn_backlog_count(st.user_id) AS backlog_count
-FROM student st;
+FROM students st;
+
+GRANT SELECT, INSERT, UPDATE ON grade_scale, revaluation_request TO app_user;
+GRANT SELECT ON v_enrollment_result, v_assignment_status, v_reval_status,
+    v_transcript, v_backlog, v_student_academic_summary TO app_user;
+GRANT EXECUTE ON FUNCTION fn_total(BIGINT), fn_grade(NUMERIC),
+    fn_sgpa(BIGINT, INTEGER), fn_cgpa(BIGINT), fn_backlog_count(BIGINT)
+    TO app_user;
+GRANT EXECUTE ON PROCEDURE sp_publish_results(BIGINT),
+    sp_request_revaluation(BIGINT, BIGINT, TEXT, INTERVAL),
+    sp_decide_revaluation(BIGINT, BIGINT, VARCHAR, NUMERIC)
+    TO app_user;

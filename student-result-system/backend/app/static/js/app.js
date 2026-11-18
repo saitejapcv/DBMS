@@ -21,12 +21,12 @@ const menuItems = [
   ["departments", "Departments", ["student", "professor", "admin"]],
   ["subjects", "Subjects", ["student", "professor", "admin"]],
   ["users", "Admin users", ["admin"]],
-  ["course-offerings", "Course Offerings"],
-  ["enrollments", "Enrollments"],
-  ["marks", "Marks"],
-  ["grade-scale", "Grade Scale"],
-  ["revaluation", "Revaluation Requests"],
-  ["transcript", "Transcript"],
+  ["course-offerings", "Teaching Assignments", ["student", "professor", "admin"]],
+  ["enrollments", "Enrollments", ["professor", "admin"]],
+  ["marks", "Marks", ["professor", "admin"]],
+  ["grade-scale", "Grade Scale", ["student", "professor", "admin"]],
+  ["revaluation", "Revaluation Requests", ["student", "professor", "admin"]],
+  ["transcript", "Transcript", ["student"]],
 ];
 
 function token() { return sessionStorage.getItem(tokenKey); }
@@ -97,6 +97,12 @@ async function go(view) {
     if (view === "departments") await renderDepartments();
     if (view === "subjects") await renderSubjects();
     if (view === "users") await renderUsers();
+    if (view === "course-offerings") await renderAssignments();
+    if (view === "enrollments") await renderEnrollments();
+    if (view === "marks") await renderMarks();
+    if (view === "grade-scale") await renderGradeScale();
+    if (view === "revaluation") await renderRevaluation();
+    if (view === "transcript") await renderTranscript();
   } catch (error) {
     ui.content.innerHTML = unavailable("Unable to load this page", error.message);
   }
@@ -111,9 +117,80 @@ function renderDashboard() {
   ui.content.innerHTML = `<section class="panel"><p class="eyebrow">Welcome back</p><h2>${esc(state.user.name)}</h2><p class="muted">${copy[state.user.role]}</p></section><section class="card-grid"><article class="card"><strong>${state.user.role === "admin" ? "Manage" : "Browse"}</strong><p>Departments and subjects</p></article><article class="card"><strong>${state.user.role === "student" ? "Profile" : "Access"}</strong><p>Role-based information</p></article><article class="card"><strong>6</strong><p>Future academic modules</p></article></section>`;
 }
 
+function assignmentOptions(rows) {
+  return rows.map((row) => `<option value="${row.assignment_id}">${esc(row.subject_code)} — ${esc(row.academic_year)} ${esc(row.term)} (#${row.assignment_id})</option>`).join("");
+}
+
+async function renderAssignments() {
+  const rows = await api("/assignments/");
+  const create = state.user.role === "admin" ? `<aside class="panel"><h3>Create teaching assignment</h3><form id="assignment-form"><label>Subject code<input id="assignment-subject" required maxlength="20"></label><label>Professor user ID<input id="assignment-professor" type="number" min="1" required></label><label>Academic year<input id="assignment-year" required maxlength="10" placeholder="2025"></label><label>Term<select id="assignment-term"><option>ODD</option><option>EVEN</option><option>SUMMER</option></select></label><div class="form-actions"><button class="button button-primary">Create assignment</button></div></form></aside>` : "";
+  ui.content.innerHTML = `<div class="split-layout"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Member 2 &amp; 3 academic flow</p><h2>Teaching assignments</h2></div><p class="subtle">${rows.length} total</p></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Subject</th><th>Professor</th><th>Year / term</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows.map((row) => { const status = row.published_at ? "Published" : row.submitted_at ? "Submitted" : "Draft"; const action = state.user.role === "professor" && !row.published_at ? (row.submitted_at ? `<button class="button button-secondary button-small" data-publish-assignment="${row.assignment_id}">Publish results</button>` : `<button class="button button-secondary button-small" data-submit-assignment="${row.assignment_id}">Submit marks</button>`) : "—"; return `<tr><td>${row.assignment_id}</td><td>${esc(row.subject_code)}</td><td>${row.professor_id}</td><td>${esc(row.academic_year)} / ${esc(row.term)}</td><td>${status}</td><td>${action}</td></tr>`; }).join("") || "<tr><td colspan=6>No assignments found.</td></tr>"}</tbody></table></div></section>${create}</div>`;
+  document.querySelectorAll("[data-submit-assignment]").forEach((button) => button.addEventListener("click", async () => {
+    try { await api(`/assignments/${button.dataset.submitAssignment}/submit`, { method: "PATCH" }); notice("Marks submitted. You can publish the results now."); renderAssignments(); } catch (error) { notice(error.message, true); }
+  }));
+  document.querySelectorAll("[data-publish-assignment]").forEach((button) => button.addEventListener("click", async () => {
+    try { await api(`/results/assignments/${button.dataset.publishAssignment}/publish`, { method: "POST" }); notice("Results published successfully."); renderAssignments(); } catch (error) { notice(error.message, true); }
+  }));
+  if (state.user.role === "admin") document.querySelector("#assignment-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = { subject_code: document.querySelector("#assignment-subject").value.trim(), professor_id: Number(document.querySelector("#assignment-professor").value), academic_year: document.querySelector("#assignment-year").value.trim(), term: document.querySelector("#assignment-term").value };
+    try { await api("/assignments/", { method: "POST", body: JSON.stringify(data) }); notice("Teaching assignment created."); renderAssignments(); } catch (error) { notice(error.message, true); }
+  });
+}
+
+async function renderEnrollments() {
+  const assignments = await api("/assignments/");
+  ui.content.innerHTML = `<section class="panel"><div class="section-heading"><div><p class="eyebrow">Course roster</p><h2>Enrollments</h2></div></div><label for="enrollment-assignment">Teaching assignment</label><select id="enrollment-assignment">${assignmentOptions(assignments)}</select><div id="enrollment-content" class="page-content"></div></section>`;
+  const select = document.querySelector("#enrollment-assignment");
+  const load = async () => {
+    const assignmentId = select.value;
+    const rows = await api(`/assignments/${assignmentId}/enrollments`);
+    document.querySelector("#enrollment-content").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Enrollment</th><th>Student</th><th>Enrolled</th><th>Grade</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${row.enrollment_id}</td><td>${row.student_id}</td><td>${esc(row.enrolled_on)}</td><td>${esc(row.grade || "Pending")}</td></tr>`).join("") || "<tr><td colspan=4>No enrollments found.</td></tr>"}</tbody></table></div>${state.user.role === "admin" ? `<form id="enrollment-form" class="panel"><h3>Enroll a student</h3><label>Student user ID<input id="enrollment-student" type="number" min="1" required></label><div class="form-actions"><button class="button button-primary">Enroll student</button></div></form>` : ""}`;
+    if (state.user.role === "admin") document.querySelector("#enrollment-form").addEventListener("submit", async (event) => { event.preventDefault(); try { await api(`/assignments/${assignmentId}/enrollments`, { method: "POST", body: JSON.stringify({ student_id: Number(document.querySelector("#enrollment-student").value) }) }); notice("Student enrolled."); load(); } catch (error) { notice(error.message, true); } });
+  };
+  if (assignments.length) { select.addEventListener("change", load); await load(); } else document.querySelector("#enrollment-content").innerHTML = unavailable("No assignments", "Create a teaching assignment first.");
+}
+
+async function renderMarks() {
+  const assignments = await api("/assignments/");
+  ui.content.innerHTML = `<section class="panel"><div class="section-heading"><div><p class="eyebrow">Evaluation and marks</p><h2>Marks</h2></div></div><label for="marks-assignment">Teaching assignment</label><select id="marks-assignment">${assignmentOptions(assignments)}</select><div id="marks-content" class="page-content"></div></section>`;
+  const select = document.querySelector("#marks-assignment");
+  const load = async () => {
+    const assignmentId = select.value;
+    const components = await api(`/assignments/${assignmentId}/components`);
+    const componentOptions = components.map((row) => `<option value="${row.component_id}">${esc(row.name)} (max ${row.max_marks}, ${row.weightage}%)</option>`).join("");
+    document.querySelector("#marks-content").innerHTML = `${state.user.role === "professor" ? `<form id="component-form" class="panel"><h3>Add evaluation component</h3><div class="form-grid"><label>Name<input id="component-name" required maxlength="100"></label><label>Max marks<input id="component-max" type="number" min="0.01" step="0.01" required></label><label>Weightage<input id="component-weight" type="number" min="1" max="100" step="0.01" required></label></div><div class="form-actions"><button class="button button-primary">Add component</button></div></form>` : ""}<section class="panel"><h3>Components</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Max marks</th><th>Weightage</th></tr></thead><tbody>${components.map((row) => `<tr><td>${row.component_id}</td><td>${esc(row.name)}</td><td>${row.max_marks}</td><td>${row.weightage}%</td></tr>`).join("") || "<tr><td colspan=4>No components found.</td></tr>"}</tbody></table></div></section>${state.user.role === "professor" && components.length ? `<form id="marks-form" class="panel"><h3>Bulk upload marks</h3><label>Component<select id="marks-component">${componentOptions}</select></label><label>Marks JSON<textarea id="marks-json" rows="5" placeholder='[{"enrollment_id": 1, "marks_obtained": 82}]' required></textarea></label><div class="form-actions"><button class="button button-primary">Save marks</button></div></form>` : ""}<section id="component-marks"></section>`;
+    if (state.user.role === "professor") document.querySelector("#component-form").addEventListener("submit", async (event) => { event.preventDefault(); try { await api(`/assignments/${assignmentId}/components`, { method: "POST", body: JSON.stringify({ name: document.querySelector("#component-name").value.trim(), max_marks: Number(document.querySelector("#component-max").value), weightage: Number(document.querySelector("#component-weight").value) }) }); notice("Evaluation component added."); load(); } catch (error) { notice(error.message, true); } });
+    if (state.user.role === "professor" && components.length) document.querySelector("#marks-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const componentId = Number(document.querySelector("#marks-component").value); const marks = JSON.parse(document.querySelector("#marks-json").value); await api(`/assignments/${assignmentId}/marks/bulk`, { method: "POST", body: JSON.stringify({ component_id: componentId, marks }) }); notice("Marks saved successfully."); } catch (error) { notice(error.message, true); } });
+    if (components.length) { const marks = await api(`/assignments/components/${components[0].component_id}/marks`); document.querySelector("#component-marks").innerHTML = `<section class="panel"><h3>Saved marks</h3><div class="table-wrap"><table><thead><tr><th>Enrollment</th><th>Student</th><th>Marks</th><th>Entered</th></tr></thead><tbody>${marks.map((row) => `<tr><td>${row.enrollment_id}</td><td>${row.student_id}</td><td>${row.marks_obtained}</td><td>${esc(row.entered_at)}</td></tr>`).join("") || "<tr><td colspan=4>No marks found.</td></tr>"}</tbody></table></div></section>`; }
+  };
+  if (assignments.length) { select.addEventListener("change", load); await load(); } else document.querySelector("#marks-content").innerHTML = unavailable("No assignments", "Create a teaching assignment first.");
+}
+
+async function renderGradeScale() {
+  const rows = await api("/results/grade-scale");
+  ui.content.innerHTML = `<section class="panel"><p class="eyebrow">Result rules</p><h2>Grade scale</h2><div class="table-wrap"><table><thead><tr><th>Grade</th><th>Minimum marks</th><th>Grade points</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.letter_grade)}</td><td>${row.min_marks ?? "—"}</td><td>${row.grade_points}</td></tr>`).join("")}</tbody></table></div></section>`;
+}
+
+async function renderTranscript() {
+  const [summary, transcript, backlogs] = await Promise.all([api("/results/me/summary"), api("/results/me/transcript"), api("/results/me/backlogs")]);
+  ui.content.innerHTML = `<section class="card-grid"><article class="card"><strong>${summary.cgpa ?? "—"}</strong><p>CGPA</p></article><article class="card"><strong>${summary.backlog_count}</strong><p>Current backlogs</p></article><article class="card"><strong>${transcript.length}</strong><p>Published subjects</p></article></section><section class="panel"><p class="eyebrow">Academic record</p><h2>Transcript</h2><form id="sgpa-form" class="inline-form"><label for="sgpa-semester">Semester</label><input id="sgpa-semester" type="number" min="1" required><button class="button button-secondary">Calculate SGPA</button><strong id="sgpa-result"></strong></form><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Semester</th><th>Marks</th><th>Grade</th><th>Status</th></tr></thead><tbody>${transcript.map((row) => `<tr><td>${esc(row.subject_code)} — ${esc(row.subject_name)}</td><td>${row.semester_no}</td><td>${row.total_marks ?? "—"}</td><td>${esc(row.grade)}</td><td>${esc(row.result_status)}</td></tr>`).join("") || "<tr><td colspan=5>No published results yet.</td></tr>"}</tbody></table></div></section>${backlogs.length ? `<section class="panel"><h2>Backlogs</h2><p>${backlogs.map((row) => `${esc(row.subject_code)} (${esc(row.grade)})`).join(", ")}</p></section>` : ""}`;
+  document.querySelector("#sgpa-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const semester = Number(document.querySelector("#sgpa-semester").value); const result = await api(`/results/me/sgpa/${semester}`); document.querySelector("#sgpa-result").textContent = `SGPA: ${result.sgpa ?? "—"}`; } catch (error) { notice(error.message, true); } });
+}
+
+async function renderRevaluation() {
+  const rows = await api("/results/revaluation");
+  const create = state.user.role === "student" ? `<aside class="panel"><h3>Request revaluation</h3><form id="revaluation-form"><label>Enrollment ID<input id="reval-enrollment" type="number" min="1" required></label><label>Component ID<input id="reval-component" type="number" min="1" required></label><label>Reason<textarea id="reval-reason" rows="4" required></textarea></label><label>Window (days)<input id="reval-window" type="number" min="1" max="90" value="15" required></label><div class="form-actions"><button class="button button-primary">Submit request</button></div></form></aside>` : state.user.role === "admin" ? `<aside class="panel"><h3>Administrator view</h3><p class="subtle">Administrators can review request status. Decisions remain restricted to the assigned professor.</p></aside>` : "";
+  ui.content.innerHTML = `<div class="split-layout"><section class="panel"><p class="eyebrow">Academic review</p><h2>Revaluation requests</h2><div class="table-wrap"><table><thead><tr><th>Request</th><th>Enrollment</th><th>Component</th><th>Reason</th><th>Status</th><th>Decision</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${row.request_id}</td><td>${row.enrollment_id}</td><td>${row.component_id}</td><td>${esc(row.reason)}</td><td>${esc(row.revaluation_status)}</td><td>${state.user.role === "professor" && !row.decision ? `<button class="button button-secondary button-small" data-reval-decision="${row.request_id}" data-decision="Approved">Approve</button> <button class="button button-danger button-small" data-reval-decision="${row.request_id}" data-decision="Rejected">Reject</button>` : esc(row.decision || "Pending")}</td></tr>`).join("") || "<tr><td colspan=6>No requests found.</td></tr>"}</tbody></table></div></section>${create}</div>`;
+  if (state.user.role === "student") document.querySelector("#revaluation-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = { enrollment_id: Number(document.querySelector("#reval-enrollment").value), component_id: Number(document.querySelector("#reval-component").value), reason: document.querySelector("#reval-reason").value.trim(), window_days: Number(document.querySelector("#reval-window").value) }; try { await api("/results/revaluation", { method: "POST", body: JSON.stringify(data) }); notice("Revaluation request submitted."); renderRevaluation(); } catch (error) { notice(error.message, true); } });
+  document.querySelectorAll("[data-reval-decision]").forEach((button) => button.addEventListener("click", async () => { const decision = button.dataset.decision; let newMarks = null; if (decision === "Approved") { const value = window.prompt("Enter the new marks:"); if (value === null) return; newMarks = Number(value); } try { await api(`/results/revaluation/${button.dataset.revalDecision}`, { method: "PATCH", body: JSON.stringify({ decision, new_marks: newMarks }) }); notice("Revaluation decision saved."); renderRevaluation(); } catch (error) { notice(error.message, true); } }));
+}
+
 async function renderProfile() {
   if (state.user.role === "professor") {
-    ui.content.innerHTML = unavailable("Professor profile unavailable", "The backend needs GET /professors/me. The current token has no employee ID, so this portal will not guess one.");
+    const professor = await api("/professors/me");
+    const fields = [["Employee ID", professor.employee_id], ["Name", professor.name], ["Email", professor.email], ["Designation", professor.designation], ["Department", `${professor.department_name} (${professor.department_code})`]];
+    ui.content.innerHTML = `<section class="panel"><p class="eyebrow">Professor profile</p><h2>${esc(professor.name)}</h2><dl class="profile-list">${fields.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl></section>`;
     return;
   }
   const students = await api("/students/");
