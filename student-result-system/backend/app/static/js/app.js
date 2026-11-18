@@ -57,7 +57,7 @@ async function api(path, options = {}) {
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(path, { ...options, headers });
   const isJson = (response.headers.get("content-type") || "").includes("application/json");
-  const payload = isJson ? await response.json() : null;
+  const payload = response.status === 204 || response.status === 205 ? null : (isJson ? await response.json() : null);
   if (response.status === 401) {
     logout("Your session has expired. Please sign in again.");
     throw new Error("Your session has expired.");
