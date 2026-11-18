@@ -74,12 +74,14 @@ def get_grade_scale(
 def publish_assignment_results(
     assignment_id: int,
     conn: Connection = Depends(get_user_db_connection),
-    current_user: dict = Depends(require_professor()),
+    current_user: dict = Depends(get_current_user),
 ):
     assignment = repo.get_assignment_owner(conn, assignment_id)
     if assignment is None:
         raise HTTPException(status_code=404, detail="Teaching assignment not found")
-    if assignment["professor_id"] != current_user["user_id"]:
+    if current_user["role"] not in {"admin", "professor"}:
+        raise HTTPException(status_code=403, detail="Only an administrator or assigned professor can publish")
+    if current_user["role"] == "professor" and assignment["professor_id"] != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Only the assigned professor can publish")
     service.publish(conn, assignment_id)
 

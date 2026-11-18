@@ -107,7 +107,7 @@ Neither `.env` file is committed. Use the matching `.env.example` as a template.
 - `GET /users/me` returns the signed-in user.
 - `/departments`, `/students`, `/professors`, `/subjects`, and `/users` provide the Member 1 management endpoints.
 - `/assignments` provides teaching assignment, enrollment, evaluation component, and bulk marks endpoints.
-- `/results` provides transcripts, CGPA/SGPA, grade scales, result publishing, backlogs, and revaluation endpoints.
+- `/results` provides transcripts, CGPA/SGPA, grade scales, result publishing, backlogs, and revaluation endpoints. Professors submit marks first; administrators can publish submitted results for student visibility.
 - `GET /health` returns a simple health response.
 
 Send the token returned by login as `Authorization: Bearer <token>` for protected endpoints. Use `/docs` for the full request and response schemas.
