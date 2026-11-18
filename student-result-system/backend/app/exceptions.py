@@ -1,8 +1,12 @@
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from psycopg.errors import UniqueViolation, ForeignKeyViolation
+from psycopg.errors import (
+    UniqueViolation,
+    ForeignKeyViolation,
+    RaiseException,
+    CheckViolation,
+)
 from psycopg import Error as PsycopgError
 
 
@@ -24,6 +28,9 @@ def register_exception_handlers(app: FastAPI):
             "departments_department_name_key": "Department name already exists",
             "professors_employee_id_key": "Employee ID already exists",
             "subjects_pkey": "Subject code already exists",
+            "uq_teaching_assignment": "Teaching assignment already exists for this subject, year, term, and professor",
+            "uq_student_assignment": "Student is already enrolled in this teaching assignment",
+            "uq_assignment_component": "Component name already exists for this teaching assignment",
         }
 
         return JSONResponse(
@@ -45,6 +52,16 @@ def register_exception_handlers(app: FastAPI):
         return JSONResponse(
             status_code=400,
             content={"detail": "Invalid referenced record"}
+        )
+
+    # 2b. Custom trigger exceptions & CHECK constraints
+    @app.exception_handler(RaiseException)
+    @app.exception_handler(CheckViolation)
+    async def trigger_or_check_handler(request: Request, exc):
+        message = str(exc).splitlines()[0]
+        return JSONResponse(
+            status_code=400,
+            content={"detail": message}
         )
 
     # 3. Other unexpected PostgreSQL errors

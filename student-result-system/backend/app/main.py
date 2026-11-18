@@ -10,6 +10,7 @@ from app.routes import (
     subject_routes,
     auth_routes,
     user_routes,
+    academic_routes,
 )
 from app.exceptions import register_exception_handlers
 
@@ -30,11 +31,13 @@ app.include_router(student_routes.router)
 app.include_router(department_routes.router)
 app.include_router(professor_routes.router)
 app.include_router(subject_routes.router)
+app.include_router(academic_routes.router)
 
 
 @app.get("/")
 def root():
     return FileResponse(BASE_DIR / "templates" / "index.html")
+
 
 @app.get("/health")
 def health():
