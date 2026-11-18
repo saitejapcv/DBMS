@@ -19,6 +19,7 @@ class ProfessorUpdate(BaseModel):
 
 
 class ProfessorResponse(BaseModel):
+    user_id: int
     employee_id: str
     name: str
     email: EmailStr
